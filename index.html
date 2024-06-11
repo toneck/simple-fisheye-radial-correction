@@ -1,0 +1,737 @@
+<html>
+<head>
+	<title>TV selector</title>
+	
+		<!--<script defer src="/index.js"></script>!-->
+
+</head>
+<body>
+	<div style="height:100%; min-height: 900px">
+		<div style="display:block; width:100%; height:45%; min-width:1100px">
+			<div style="display: inline-block; width:25%; height:100%; min-width:220px; vertical-align:top;">
+				<h3>Image source:</h3>
+				<p>Choose a file:</p>
+				<input type="file" id="myImageFile"></input>
+				<!---
+				<p>Paste link and hit ENTER:</p>
+				<input type="link" id="myImageLink"></input>
+				<button id="loadButton"> Load </button>
+				<p></p>
+				<button id="reloadButton"> Reload </button>
+				!--->
+				<h3>Image info:</h3>
+				<ul>
+					<li>Source: <span id="pointUL"></span></li>
+					<li>Format: <span id="pointUR"></span></li>
+					<li>Width: <span id="pointLL"></span></li>
+					<li>Size: <span id="pointLR"></span></li>
+				</ul>
+				<h3>Lens Edge</h3>
+				<table >
+					<tr>
+						<td>Center X:</td>
+						<td><input type="number" id="centerXInput"><td>
+					</tr>
+					<tr>
+						<td>Center Y:</td>
+						<td><input type="number" id="centerYInput"><td>
+					</tr>
+					<tr>
+						<td>Radius:</td>
+						<td><input type="number" id="radiusInput"><td>
+					</tr>
+				</table>
+				<p></p>
+				<button id="setCenterButton"> Set </button>
+				<h3>Points:</h3>
+				<ul>
+					<li>Upper left corner: <span id="pointUL"></span></li>
+					<li>Upper right corner: <span id="pointUR"></span></li>
+					<li>Lower left corner: <span id="pointLL"></span></li>
+					<li>Lower right corner: <span id="pointLR"></span></li>
+				</ul>
+				<span><button id="startButton"> Start </button> <span>err</span></span>
+				<p></p>
+				<button id="refreshButton"> Refresh </button>  
+				<p></p>
+				<button id="showButton"> Show Points </button>  
+				<table id="pointsTable">
+				
+				
+				</table>
+				<span id="goodPointsSpan" style="color:green; display:none;"> Points well placed</span>
+				<p></p>
+				<button id="cropButton" onclick="cropButtonCall()" style="display:none;"> Crop! </button>
+				<p></p>
+				<button id="unlockButton" onclick="unlockPointsButtonCall()" style="display:none;"> Unlock points </button>  
+			</div>
+			<div id="canvasDiv" style="display: inline-block; width:70%; height:100%; vertical-align:top;">
+				<form style="position:relative; width:100%;">
+					<canvas id="scaledImageCanvas"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 0;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+					<canvas id="staticCirclesCanvas"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 1;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+					<canvas id="draggingCirclesCanvas"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 1;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+				</form>
+			</div>
+		</div>
+		<div style="display:block; width:100%; height:10%;">
+		</div>
+		<div style="display:block; width:100%; height:45%; display:none;">
+			<div style="display: inline-block; width:25%; height:100%; vertical-align:top;">
+				<h3>Number leds on:</h3>
+				<table>
+					<tr><td>top: 		</td><td><input type="number" id="numberLedsTop" value="25" style="width:60px; horizontal-align:right;"></td></tr>
+					<tr><td>bottom: 	</td><td><input type="number" id="numberLedsBottom" value="26" style="width:60px;"></td></tr>
+					<tr><td>left: 		</td><td><input type="number" id="numberLedsLeft" value="13" style="width:60px;"></td></tr>
+					<tr><td>right: 		</td><td><input type="number" id="numberLedsRight" value="13" style="width:60px;"></td></tr>
+				</table>
+				<h3>Border size:</h3>
+				<table>
+					<tr><td>top: 		</td><td><input type="number" id="borderSizeTop" value="20" style="width:60px;"></td></tr>
+					<tr><td>bottom: 	</td><td><input type="number" id="borderSizeBottom" value="20" style="width:60px;"></td></tr>
+					<tr><td>left: 		</td><td><input type="number" id="borderSizeLeft" value="20" style="width:60px;"></td></tr>
+					<tr><td>right: 		</td><td><input type="number" id="borderSizeRight" value="20" style="width:60px;"></td></tr>
+				</table>
+				<p></p>
+				<button onclick="checkBordersButtonCall()"> Check borders </button>  
+				<p></p>
+				<button id="hideLedOverlayButton" onclick="hideLedOverlayButtonCall()" style="display:none;"> Hide LED Overlay </button>
+				<p></p>
+				<button id="hideLedBackgroundButton" onclick="hideLedBackgroundButtonCall()" style="display:none;"> Hide LED Background </button>
+				<p></p>
+				<button id="activateLEDsButton" onclick="activateLEDsButtonCall()" style="display:none;"> Activate LEDs</button>
+			</div>
+			<div id="cropCanvasDiv" style="display: inline-block; width:70%; height:100%; vertical-align:top;">
+				<form style="position:relative; width:100%;">
+					<canvas id="cropCanvasBackgroud"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 0;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+					<canvas id="cropCanvasImage"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 1;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+					<canvas id="cropCanvasOverlay"  width="800" height="600" style="position: absolute; left: 0; top: 0; z-index: 2;" >
+					Your browser does not support the HTML5 canvas tag.
+					</canvas>
+				</form>
+			</div>
+		</div>
+	</div>
+	<iframe id="commandIFrame" style="display:none;"></iframe>
+	<script>
+	var handleRadius = 10;
+	
+	var originalImageData = null;
+	var scaledImageData = null;
+	var scaledImageWidth = 0;
+	var scaledImageHeight = 0;
+	
+	var scaledImageCanvasContext = document.getElementById("scaledImageCanvas").getContext("2d");
+	var staticCirclesCanvasContext = document.getElementById("staticCirclesCanvas").getContext("2d");
+	var draggingCirclesCanvasContext = document.getElementById("draggingCirclesCanvas").getContext("2d");
+	
+	centerX=400;
+	centerY=300;
+	Radius=100;
+	
+	var mouse = {x:0, y:0, downX:0, downY:0, upX:0, upY:0, isdown:0, isdrag:0, clicksinplace:0, clickcount:0};
+	var points = [];
+	var points_added = 0;
+	
+	var marker_size_circle_center=5;
+	var marker_size_regular_point=10;
+	
+	
+	var starttransform=0;
+//colors
+var defaultCrossColor = 'rgba(1,1,0,1)';
+var dragCrossColor = 'rgba(255,255,70,1)';
+var selectedPointCrossColor = 'rgba(255,255,70,1)';
+var selectedPointCircleColor = 'rgba(255,0,0,1)';
+var lineColor = 'rgba(10,200,250,1)';
+
+var ledRectColor = selectedPointCrossColor;//'rgba(10,200,250,1)';
+var ledRectAccentColor = selectedPointCircleColor;//'rgba(10,200,250,1)';
+
+var textColor = selectedPointCircleColor;
+//
+	
+	window.onload = function(){
+		draggingCirclesCanvas = document.getElementById("draggingCirclesCanvas");
+		draggingCirclesCanvas.onmousemove = mouseMove;
+		draggingCirclesCanvas.onmousedown = mouseDown;
+		draggingCirclesCanvas.onmouseup = mouseUp;
+		
+		document.getElementById('myImageFile').onchange = function (evt) {
+			
+			function showImage(fileReader) {
+				var img = new Image;
+				img.onload = () => drawImageData(img);
+				img.src = fileReader.result;
+				originalImageData = fileReader.result;
+			}
+			
+			var tgt = evt.target || window.event.srcElement,
+			files = tgt.files;console.log("img data:", evt);
+
+			// FileReader support
+			if (FileReader && files && files.length) {
+				var fr = new FileReader();
+				fr.onload = () => showImage(fr);
+				fr.readAsDataURL(files[0]);
+			}
+		}
+		
+		/*
+		document.getElementById('myImageLink').onchange = function (evt) {
+			var img = new Image;
+			img.crossOrigin = "Anonymous";
+			img.setAttribute('crossOrigin', '');
+			img.onload = () => drawImageData(img);
+			img.src = evt.target.value;
+			console.log("link data:", evt.target.value);
+			//https://cdn.sstatic.net/Sites/stackoverflow/Img/icon-48.png?v=b7e36f88ff92
+		}
+		
+		
+		document.getElementById('loadButton').onclick = function (evt) {
+			var img = new Image;
+			img.crossOrigin = "Anonymous";
+			img.setAttribute('crossOrigin', '');
+			img.onload = () => drawImageData(img);
+			img.src = document.getElementById('myImageLink').value;
+		}
+		
+		document.getElementById('reloadButton').onclick = function (evt) {
+			var img = new Image;
+			img.onload = () => drawImageData(img);
+			img.src = originalImageData;
+		}
+		*/
+		
+		document.getElementById('startButton').onclick = function (evt) {
+			if(points.length>=2){
+				starttransform=1;
+				updatePointsRadius();
+				showCorrectedImage();
+			}
+		}
+		
+		document.getElementById('setCenterButton').onclick = function (evt) {
+			if(scaledImageData){
+				var centerX = Number(document.getElementById("centerXInput").value);
+				var centerY = Number(document.getElementById("centerYInput").value);
+				var radius = Number(document.getElementById("radiusInput").value);
+				
+				if(points.length > 0){
+					points[0].x = centerX;
+					points[0].y = centerY;
+				}
+				if(points.length > 1){
+					updatePointsRadius();
+					if(points[points.length - 1].distortedRadius == radius)
+					{
+						redrawPoints();
+						return;
+					}
+				}
+				
+				x = centerX - radius;
+				y = 0;
+				
+				if(x < 0)
+					x = centerX + radius;
+				
+				if(x > scaledImageWidth){
+					x = 0;
+					y = centerY - radius;
+				}
+				
+				if(y < 0){
+					x = 0;
+					y = centerY + radius;
+				}
+				
+				if(y > scaledImageHeight){
+					x = centerX - radius/sqrt(2);
+					y = centerY - radius/sqrt(2);
+				}
+				
+				addPoint(x, y);
+				redrawPoints();
+			}
+			
+		}
+		
+		
+		document.getElementById('showButton').onclick = function (evt) {
+			
+			updatePointsRadius();
+			var table = document.getElementById("pointsTable");
+			
+			try{
+			for(var i = 0; i < 30;i++)
+				table.deleteRow(0);
+			}catch{}
+			
+			edge = points[points.length - 1];
+			document.getElementById("centerXInput").value = points[0].x;
+			document.getElementById("centerYInput").value = points[0].y;
+			document.getElementById("radiusInput").value = Math.floor(edge.distortedRadius);
+			
+			head = table.insertRow(0);
+			var cell1 = head.insertCell(0);
+			var cell2 = head.insertCell(1);
+			cell1.innerHTML = "correctedRadius";
+			cell2.innerHTML = "distortedRadius";
+			
+			for(var i = 0; i < points.length;i++){
+				var row = table.insertRow(i+1);
+				var cell1 = row.insertCell(0);
+				var cell2 = row.insertCell(1);
+				cell1.innerHTML = round(points[i].correctedRadius/edge.correctedRadius,4);
+				cell2.innerHTML = round(points[i].distortedRadius/edge.distortedRadius,4);
+			}
+			
+			
+		}
+	
+	}
+	
+	
+function round(value, zecimals = 0){
+	return Math.round(value * 10**zecimals)/10**zecimals;
+}
+	
+	
+	
+
+	function drawImageData(img) {
+		originalImageData = img.data;
+		ctx = scaledImageCanvasContext;
+		canvasWidth = ctx.canvas.width
+		canvasHeight = ctx.canvas.height
+		imgWidth = img.width;
+		imgHeight = img.height;
+		scalingFactor = Math.min(canvasWidth/imgWidth,canvasHeight/imgHeight);
+		scaledImageWidth = imgWidth*scalingFactor;
+		scaledImageHeight = imgHeight*scalingFactor;
+		ctx.drawImage(img, 0, 0, scaledImageWidth, scaledImageHeight);
+		scaledImageData = ctx.getImageData(0, 0, scaledImageWidth, scaledImageHeight).data;
+		console.log("ctx data:", ctx);
+	}
+	function drawCircleCenter(){
+		context = points[0].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
+		size = points[0].isdrag?marker_size_circle_center*1.5:marker_size_circle_center;
+		context.strokeStyle = selectedPointCrossColor;
+		drawCross(context, points[0].x, points[0].y, size*4);
+		context.strokeStyle = selectedPointCircleColor;
+		drawCircle(context, points[0].x, points[0].y, size);
+	}
+	
+	function drawPoint(pointIdx){
+		if(pointIdx==0){
+			drawCircleCenter();
+			return;
+		}
+		context = points[pointIdx].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
+		size = points[pointIdx].isdrag?marker_size_regular_point*1.5:marker_size_regular_point;
+		context.strokeStyle = lineColor;
+		centerX = points[0].x;
+		centerY = points[0].y;
+		pointx = points[pointIdx].x;
+		pointy = points[pointIdx].y;
+		radius = distance(pointx,pointy,centerX,centerY);
+		drawCircle(context, centerX, centerY, radius);
+		
+		
+		context.strokeStyle = selectedPointCircleColor;
+		drawCircle(context, pointx, pointy, size);
+	}
+
+
+	function drawCircle(context, x, y, size = 10){
+		context.beginPath();
+		context.arc(x, y, size, 0, 2 * Math.PI);
+		context.stroke();
+	}
+
+	function drawCross(context, x, y, size = 20){
+		drawLine(context, x - size/2, y, x + size/2,y);
+		drawLine(context, x, y - size/2, x, y + size/2);
+	}
+	
+	function drawX(context, x, y, size = 20){
+		drawLine(context, x - size/2, y, x + size/2,y);
+		drawLine(context, x, y - size/2, x, y + size/2);
+	}
+	
+	function distance(p1x,p1y,p2x,p2y){
+		dx = p1x - p2x;
+		dy = p1y - p2y;
+		return Math.sqrt(dx**2 + dy**2);
+	}
+	
+function drawLine(context, x1, y1, x2, y2){
+	context.beginPath();
+	context.moveTo(x1, y1);
+	context.lineTo(x2, y2);
+	context.stroke();
+}
+
+function drawPoints(){
+	drawCircleCenter();
+	for(let i = 1; i < points.length; i++){
+		drawPoint(i);
+	}
+}
+
+function redrawPoint(idx){
+	if(points[idx].isdrag){
+		clearCanvas(draggingCirclesCanvasContext);
+		drawPoint(idx);
+	}else{
+		redrawPoints(idx);
+	}
+}
+
+
+function redrawPoints(){
+	clearCanvas(draggingCirclesCanvasContext);
+	clearCanvas(staticCirclesCanvasContext);
+	drawPoints();
+}
+
+function clearCanvas(context){
+	context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+}
+
+function addLensCenter(){
+	points[0] = {x:mouse.x,y:mouse.y,isdrag:0,distortedRadius:0,correctedRadius:0};
+	drawCircleCenter();
+}
+
+
+function addPoint(x,y){
+	if(starttransform==0){
+		dx=x;
+		dy=y;
+		cx=x;
+		cy=y;
+	}else{
+		[dx, dy] = inverseCorrection(x,y);
+		cx=x;
+		cy=y;
+	}
+	points[points.length]={x:x, y:y, isdrag:0,distortedX:dx,distortedY:dy,correctedX:cx,correctedY:cy,distortedRadius:0,correctedRadius:0};
+	drawPoint(points.length-1);
+}
+	/////////////USER INPUT
+
+function movePoint(idx,x,y,drag){
+	points[idx].isdrag = drag;
+	if(starttransform==0){
+		points[dragedpoint].distortedX = x;
+		points[dragedpoint].distortedY = y;
+		points[dragedpoint].correctedX = x;
+		points[dragedpoint].correctedY = y;
+	}else{
+		points[dragedpoint].correctedX = x;
+		points[dragedpoint].correctedY = y;
+	}
+	points[dragedpoint].x = x;
+	points[dragedpoint].y = y;
+	
+	if(drag)
+		redrawPoint(idx);
+	else
+		redrawPoints();
+}
+
+//functions that handle mouse interaction
+previewlive=0;
+dragedpoint=-1;
+function mouseMove(e){
+	updateMousePosition(e);
+	mouse.clicksinplace=0;
+	if(mouse.isdown && (mouse.x != mouse.downX || mouse.y != mouse.downY))
+		mouse.isdrag = 1;
+	
+	if(dragedpoint!=-1){
+		console.log("move point " + dragedpoint);
+		movePoint(dragedpoint,mouse.x,mouse.y,1);
+		
+		if(previewlive==1){
+			updatePointsRadius();
+			showCorrectedImage();
+		}
+	}
+	
+}
+
+
+
+function mouseDown(e){
+	updateMousePosition(e);
+	mouse.downX = mouse.x;
+	mouse.downY = mouse.y;
+	mouse.isdown = 1;
+	
+	
+	dragedpoint=mouseOnPoint();
+	if(dragedpoint!=-1){
+		console.log("move point " + dragedpoint);
+		movePoint(dragedpoint,mouse.x,mouse.y,1);
+		updatePointsRadius();
+		showCorrectedImage();
+	}
+	
+	
+}
+
+function mouseUp(e){
+	updateMousePosition(e);
+	mouse.upX = mouse.x;
+	mouse.upY = mouse.y;
+	if(mouse.isdown && !mouse.isdrag)
+		mouseClick(e);
+	mouse.isdown = 0;
+	mouse.isdrag = 0;
+	
+	
+	if(dragedpoint!=-1){
+		console.log("move point " + dragedpoint);
+		movePoint(dragedpoint,mouse.x,mouse.y,0);
+		dragedpoint=-1;
+		updatePointsRadius();
+		showCorrectedImage();
+	}
+	
+}
+
+function mouseClick(e){
+	mouse.clickcount=mouse.clickcount+1;
+	mouse.clicksinplace=mouse.clicksinplace+1;
+	if(mouse.clicksinplace==2){
+		mouseDoubleClick();
+		return;
+	}
+	if(mouse.clicksinplace==3){
+		mouseTripleClick();
+		return;
+	}
+	
+	if(points.length==0){
+		addLensCenter();
+	}else if(mouseOnPoint()==-1){
+		addPoint(mouse.x, mouse.y);
+		updatePointsRadius();
+		if(starttransform)
+			showCorrectedImage();
+	}
+	
+}
+
+function mouseDoubleClick(e){
+	
+	if(dragedpoint!=-1){
+		removePoint(dragedpoint);
+		dragedpoint=-1;
+		if(starttransform)
+			showCorrectedImage();
+	}
+}
+
+function mouseTripleClick(e){
+	
+}
+
+function checkedPoints(checkResult){
+////console.log(checkResult);
+	pointsAreChecked = checkResult;
+	setVisibility(cropButton,checkResult);
+	setVisibility(goodPointsSpan,checkResult);
+	updateOverlayCanvas();
+}
+
+function mouseOnPoint(){
+	if(points.length==0)
+		return -1;
+	if(distance(mouse.downX,mouse.downY,points[0].x,points[0].y) < marker_size_circle_center)
+		return 0;
+	for (let i = 1; i < points.length; i++){
+		if(distance(mouse.downX,mouse.downY,points[i].x,points[i].y) < marker_size_regular_point)
+			return i;
+	}
+	return -1;
+}
+
+function removePoint(idx){
+	if(idx>0 && idx<points.length){
+		points.splice(idx,1);
+		console.log("remove point " + idx);
+	}
+	redrawPoints();
+}
+function updateMousePosition(e){
+	var r = scaledImageCanvasContext.canvas.getBoundingClientRect();
+	mouse.x = e.clientX - r.left,
+	mouse.y = e.clientY - r.top;
+}
+
+function calculateRadius(x,y){
+	return distance(points[0].x,points[0].y,x,y);
+}
+
+
+function updatePointsRadius(){
+	if(points.length<2)
+		return;
+	points[0].correctedRadius = 0;
+	points[0].distortedRadius = 0;
+	for (let i = 1; i < points.length; i++){
+		points[i].correctedRadius = calculateRadius(points[i].correctedX,points[i].correctedY);
+		points[i].distortedRadius = calculateRadius(points[i].distortedX,points[i].distortedY);
+	}
+	
+	for (let i = 1; i < points.length; i++){
+		for (let j = i; j < points.length; j++){
+			if(points[i].correctedRadius>points[j].correctedRadius){
+				tmp = points[i];
+				points[i]=points[j];
+				points[j]=tmp;
+			}
+		}
+	}
+}
+
+function inverseCorrection(x,y){
+	correctedRadius = calculateRadius(x,y);
+	let highRadIdx=0;
+	for(;highRadIdx < points.length;highRadIdx++){
+		if(points[highRadIdx].correctedRadius>correctedRadius)
+			break;
+	}
+	
+	var correction;
+	if(highRadIdx < points.length){
+		
+		
+		lowerPoint = points[highRadIdx-1];
+		higherPoint = points[highRadIdx];
+		
+		lowerCorrectedRadius = lowerPoint.correctedRadius
+		higherCorrectedRadius = higherPoint.correctedRadius
+		lowerDistortedRadius = lowerPoint.distortedRadius
+		higherDistortedRadius = higherPoint.distortedRadius
+		deltaCorrected = higherCorrectedRadius - lowerCorrectedRadius;
+		deltaDistorted = higherDistortedRadius - lowerDistortedRadius;
+		
+		distortedRadius = (correctedRadius - lowerCorrectedRadius)/deltaCorrected*deltaDistorted + lowerDistortedRadius;
+		
+		correction = distortedRadius/correctedRadius;
+	}else{
+		correction = points[points.length - 1].distortedRadius/points[points.length - 1].correctedRadius;
+	}
+	
+	dxCorrected = x - points[0].x;
+	dyCorrected = y - points[0].y;
+	
+	
+	dxDistorted = dxCorrected * correction;
+	dyDistorted = dyCorrected * correction;
+	
+	xDistorted = dxDistorted + points[0].x;
+	yDistorted = dyDistorted + points[0].y;
+	return [xDistorted,yDistorted];
+}
+
+
+function forwardCorrection(x,y){
+	return [x,y];
+}
+
+
+function showCorrectedImage(){
+	
+	if(scaledImageData==null)
+		return;
+	
+	if(points.length<2)
+		return;
+	
+	inputData = scaledImageData;
+	
+	var canvas = scaledImageCanvasContext.canvas;
+	var outputImageData = scaledImageCanvasContext.createImageData(canvas.width, canvas.height);
+	var outputData = outputImageData.data;
+	
+	for (var i=0; i < canvas.width;i+=1)//maxHeight; i += 1) 
+	{
+		
+		for (var j=0; j < canvas.height;j+=1)//maxWidth; j += 1) 
+		{	
+			row=j;
+			col=i;
+			[in_col,in_row] = inverseCorrection(col,row);
+			let idxout = j * canvas.width + i;
+			let idxin = Math.floor(in_row) * scaledImageWidth + Math.floor(in_col); 
+		//console.log(P3);
+			idxout = Math.floor(idxout) * 4; //RGBA
+			idxin = Math.floor(idxin) * 4; //RGBA
+			//console.log({i,j,ii,P3,jj});
+			outputData[idxout] = inputData[idxin];
+			outputData[idxout+1] = inputData[idxin+1];
+			outputData[idxout+2] = inputData[idxin+2];
+			outputData[idxout+3] = inputData[idxin+3];
+		}
+	}
+	
+	scaledImageCanvasContext.putImageData(outputImageData,0,0);
+	
+	//var base64URI = canvasEdited.toDataURL();		
+	
+	//var img = new Image;
+	//img.onload = function() { 
+	//scaledImageCanvasContext.drawImage(img,0,0);
+	//base64URI = canvasEdited.toDataURL();	 
+	
+	//croppedImage.src = base64URI;
+	//console.log(base64URI);}
+	//img.src = base64URI;
+	//img.crossOrigin = "anonymous";	
+	
+	
+}
+
+
+/*
+0 x 424.1846618652344 y 298.2755661010742
+1 11.40175425099138 36.22154055254967
+2 27.018512172212592 69.26037828369117
+3 42.579337712087536 108.11567878897121
+4 53.25410782277739 129.79984591670362
+5 73.78346698278686 158.26037656936953
+6 96.56603957913983 180.83161898038932
+7 133.01503674397117 211.39428197624474
+8 153.28731193415845 219.55491218426653
+9 180.02499826412998 234.13671220037236
+10 229.14187744713973 248.4814550631532
+11 259.724854413281 253.7791257548448
+12 320.44032205700955 261.0011443336146
+13 368.77364330982226 268.66079942866435
+14 380.67834191085785 282.11345235560816
+15 400.5246559202067 314.0143308831621
+*/
+
+
+</script>
+
+
+</body>
+</html>
+

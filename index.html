@@ -50,9 +50,13 @@
 					<li>Lower left corner: <span id="pointLL"></span></li>
 					<li>Lower right corner: <span id="pointLR"></span></li>
 				</ul>
-				<span><button id="startButton"> Start </button> <span>err</span></span>
+				<span><button id="SwitchModeButton"> Switch Mode </button> <span>err</span></span>
+				<p></p>
+				<p>MoveAllPoints <input type="checkbox" id="moveAllPoints"></p>
 				<p></p>
 				<button id="refreshButton"> Refresh </button>  
+				<p></p>
+				<button id="downloadButton"> Download </button>  
 				<p></p>
 				<button id="showButton"> Show Points </button>  
 				<table id="pointsTable">
@@ -129,6 +133,7 @@
 	var scaledImageData = null;
 	var scaledImageWidth = 0;
 	var scaledImageHeight = 0;
+	var scalingFactor = 1;
 	
 	var scaledImageCanvasContext = document.getElementById("scaledImageCanvas").getContext("2d");
 	var staticCirclesCanvasContext = document.getElementById("staticCirclesCanvas").getContext("2d");
@@ -146,22 +151,31 @@
 	var marker_size_regular_point=10;
 	
 	
-	var starttransform=0;
+	var editMode=0;
+	var firstTimeSwitch=0;
+	var moveAllPoints = false;
 //colors
-var defaultCrossColor = 'rgba(1,1,0,1)';
-var dragCrossColor = 'rgba(255,255,70,1)';
-var selectedPointCrossColor = 'rgba(255,255,70,1)';
-var selectedPointCircleColor = 'rgba(255,0,0,1)';
-var lineColor = 'rgba(10,200,250,1)';
+var defaultCrossColor = 'rgba(1, 1, 0, 1)';
+var dragCrossColor = 'rgba(255, 255, 70, 1)';
+var selectedPointCrossColor = 'rgba(255, 255, 70, 1)';
+var selectedPointCircleColor = 'rgba(255, 0, 0, 1)';
+var lineColor = 'rgba(10, 200, 250, 1)';
 
-var ledRectColor = selectedPointCrossColor;//'rgba(10,200,250,1)';
-var ledRectAccentColor = selectedPointCircleColor;//'rgba(10,200,250,1)';
+var ledRectColor = selectedPointCrossColor;//'rgba(10, 200, 250, 1)';
+var ledRectAccentColor = selectedPointCircleColor;//'rgba(10, 200, 250, 1)';
 
 var textColor = selectedPointCircleColor;
+
+
+var POINT_SIZE = 20;
+var TEXT_SIZE = 15;
+var LIMIT_DIST_TO_POINT = POINT_SIZE;
+var MAX_DISTANCE_ERROR = 0.4;//40%
+var BACKLIGHT_CONTOUR_SIZE = 40;
 //
 	
 	window.onload = function(){
-		draggingCirclesCanvas = document.getElementById("draggingCirclesCanvas");
+		var draggingCirclesCanvas = document.getElementById("draggingCirclesCanvas");
 		draggingCirclesCanvas.onmousemove = mouseMove;
 		draggingCirclesCanvas.onmousedown = mouseDown;
 		draggingCirclesCanvas.onmouseup = mouseUp;
@@ -172,7 +186,7 @@ var textColor = selectedPointCircleColor;
 				var img = new Image;
 				img.onload = () => drawImageData(img);
 				img.src = fileReader.result;
-				originalImageData = fileReader.result;
+				//originalImageData = img;//fileReader.result;
 			}
 			
 			var tgt = evt.target || window.event.srcElement,
@@ -205,19 +219,60 @@ var textColor = selectedPointCircleColor;
 			img.onload = () => drawImageData(img);
 			img.src = document.getElementById('myImageLink').value;
 		}
-		
-		document.getElementById('reloadButton').onclick = function (evt) {
-			var img = new Image;
-			img.onload = () => drawImageData(img);
-			img.src = originalImageData;
-		}
 		*/
+
+		document.getElementById('downloadButton').onclick = function (evt) {
+			let canvas = document.getElementById('scaledImageCanvas');
+			let tmp=[scaledImageData,scaledImageWidth,scaledImageHeight];
+			[scaledImageData,scaledImageWidth,scaledImageHeight]=[originalImageData,imgWidth,imgHeight];
+			[canvas.width,canvas.height]=[imgWidth,imgHeight];
+			for(let i = 0; i < points.length; i++){
+				points[i].correctedX = points[i].correctedX / scalingFactor;
+				points[i].correctedY = points[i].correctedY / scalingFactor;
+				points[i].distortedX = points[i].distortedX / scalingFactor;
+				points[i].distortedY = points[i].distortedY / scalingFactor;
+			}
+			updatePointsRadius();
+			showImage();
+
+			//https://stackoverflow.com/a/58652379
+			let downloadLink = document.createElement('a');
+			downloadLink.setAttribute('download', 'CanvasAsImage.png');
+			//let canvas = document.getElementById('scaledImageCanvas');
+			canvas.toBlob(blob => {
+			let url = URL.createObjectURL(blob);
+			downloadLink.setAttribute('href', url);
+			downloadLink.click();
+			});
+			[scaledImageData,scaledImageWidth,scaledImageHeight]=tmp;
+			[canvas.width,canvas.height]=[scaledImageWidth,scaledImageHeight];
+			for(let i = 0; i < points.length; i++){
+				points[i].correctedX = points[i].correctedX * scalingFactor;
+				points[i].correctedY = points[i].correctedY * scalingFactor;
+				points[i].distortedX = points[i].distortedX * scalingFactor;
+				points[i].distortedY = points[i].distortedY * scalingFactor;
+			}
+			updatePointsRadius();
+			showImage();
+		}
+
+		document.getElementById('moveAllPoints').onclick = function (evt) {
+			moveAllPoints = document.getElementById('moveAllPoints').checked;
+		}
 		
-		document.getElementById('startButton').onclick = function (evt) {
+
+		document.getElementById('refreshButton').onclick = function (evt) {
+			showImage();
+			redrawPoints();
+		}
+		
+		document.getElementById('SwitchModeButton').onclick = function (evt) {
 			if(points.length>=2){
-				starttransform=1;
+				editMode=1-editMode;
+				firstTimeSwitch=1;
 				updatePointsRadius();
-				showCorrectedImage();
+				showImage();
+				redrawPoints();
 			}
 		}
 		
@@ -228,8 +283,8 @@ var textColor = selectedPointCircleColor;
 				var radius = Number(document.getElementById("radiusInput").value);
 				
 				if(points.length > 0){
-					points[0].x = centerX;
-					points[0].y = centerY;
+					points[0].distortedX = centerX;
+					points[0].distortedY = centerY;
 				}
 				if(points.length > 1){
 					updatePointsRadius();
@@ -240,8 +295,8 @@ var textColor = selectedPointCircleColor;
 					}
 				}
 				
-				x = centerX - radius;
-				y = 0;
+				var x = centerX - radius;
+				var y = 0;
 				
 				if(x < 0)
 					x = centerX + radius;
@@ -278,23 +333,61 @@ var textColor = selectedPointCircleColor;
 				table.deleteRow(0);
 			}catch{}
 			
-			edge = points[points.length - 1];
-			document.getElementById("centerXInput").value = points[0].x;
-			document.getElementById("centerYInput").value = points[0].y;
+			var edge = points[points.length - 1];
+			document.getElementById("centerXInput").value = points[0].distortedX;
+			document.getElementById("centerYInput").value = points[0].distortedY;
 			document.getElementById("radiusInput").value = Math.floor(edge.distortedRadius);
 			
-			head = table.insertRow(0);
+			var head = table.insertRow(0);
 			var cell1 = head.insertCell(0);
 			var cell2 = head.insertCell(1);
-			cell1.innerHTML = "correctedRadius";
-			cell2.innerHTML = "distortedRadius";
+			var cell3 = head.insertCell(2);
+			cell1.innerHTML = "OriginalCenterX";
+			cell2.innerHTML = "OriginalCenterY";
+			cell3.innerHTML = "OriginalRadius";
 			
+
+			head = table.insertRow(1);
+			cell1 = head.insertCell(0);
+			cell2 = head.insertCell(1);
+			cell3 = head.insertCell(2);
+			cell1.innerHTML = points[0].distortedX;
+			cell2.innerHTML = points[0].distortedY;
+			cell3.innerHTML = Math.floor(edge.distortedRadius);
+
+
+
+			head = table.insertRow(2);
+			cell1 = head.insertCell(0);
+			cell2 = head.insertCell(1);
+			cell3 = head.insertCell(2);
+			cell1.innerHTML = "CorrectedCenterX";
+			cell2.innerHTML = "CorrectedCenterY";
+			cell3.innerHTML = "CorrectedRadius";
+			
+
+			head = table.insertRow(3);
+			cell1 = head.insertCell(0);
+			cell2 = head.insertCell(1);
+			cell3 = head.insertCell(2);
+			cell1.innerHTML = points[0].correctedX;
+			cell2.innerHTML = points[0].correctedY;
+			cell3.innerHTML = Math.floor(edge.correctedRadius);
+
+			
+			head = table.insertRow(4);
+			cell1 = head.insertCell(0);
+			cell2 = head.insertCell(1);
+			cell1.innerHTML = "CorrectedRadius";
+			cell2.innerHTML = "OriginalRadius";
+
+
 			for(var i = 0; i < points.length;i++){
-				var row = table.insertRow(i+1);
+				var row = table.insertRow(i+5);
 				var cell1 = row.insertCell(0);
 				var cell2 = row.insertCell(1);
-				cell1.innerHTML = round(points[i].correctedRadius/edge.correctedRadius,4);
-				cell2.innerHTML = round(points[i].distortedRadius/edge.distortedRadius,4);
+				cell1.innerHTML = round(points[i].correctedRadius/edge.correctedRadius, 4);
+				cell2.innerHTML = round(points[i].distortedRadius/edge.distortedRadius, 4);
 			}
 			
 			
@@ -311,26 +404,45 @@ function round(value, zecimals = 0){
 	
 
 	function drawImageData(img) {
-		originalImageData = img.data;
-		ctx = scaledImageCanvasContext;
-		canvasWidth = ctx.canvas.width
-		canvasHeight = ctx.canvas.height
+
 		imgWidth = img.width;
 		imgHeight = img.height;
-		scalingFactor = Math.min(canvasWidth/imgWidth,canvasHeight/imgHeight);
+		//originalImageData = img.data;
+		var ctx = scaledImageCanvasContext;
+		canvasWidth = ctx.canvas.width
+		canvasHeight = ctx.canvas.height
+
+		ctx.canvas.width = imgWidth;
+		ctx.canvas.height = imgHeight;
+		ctx.drawImage(img, 0, 0, imgWidth, imgHeight);
+		originalImageData = ctx.getImageData(0, 0, imgWidth, imgHeight).data;
+
+		ctx.canvas.width = canvasWidth;
+		ctx.canvas.height = canvasHeight;
+		scalingFactor = Math.min(canvasWidth/imgWidth, canvasHeight/imgHeight);
 		scaledImageWidth = imgWidth*scalingFactor;
 		scaledImageHeight = imgHeight*scalingFactor;
 		ctx.drawImage(img, 0, 0, scaledImageWidth, scaledImageHeight);
 		scaledImageData = ctx.getImageData(0, 0, scaledImageWidth, scaledImageHeight).data;
 		console.log("ctx data:", ctx);
 	}
+
 	function drawCircleCenter(){
-		context = points[0].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
-		size = points[0].isdrag?marker_size_circle_center*1.5:marker_size_circle_center;
+		var context = points[0].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
+		var size = points[0].isdrag?marker_size_circle_center*1.5:marker_size_circle_center;
+		var x=0;
+		var y=0;
+		if(editMode==0){
+			x=points[0].distortedX;
+			y=points[0].distortedY;
+		}else{
+			x=points[0].correctedX;
+			y=points[0].correctedY;
+		}
 		context.strokeStyle = selectedPointCrossColor;
-		drawCross(context, points[0].x, points[0].y, size*4);
+		drawCross(context, x, y, size*4);
 		context.strokeStyle = selectedPointCircleColor;
-		drawCircle(context, points[0].x, points[0].y, size);
+		drawCircle(context, x, y, size);
 	}
 	
 	function drawPoint(pointIdx){
@@ -338,19 +450,37 @@ function round(value, zecimals = 0){
 			drawCircleCenter();
 			return;
 		}
-		context = points[pointIdx].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
-		size = points[pointIdx].isdrag?marker_size_regular_point*1.5:marker_size_regular_point;
+
+		var centerX ;
+		var centerY ;
+		var pointx ;
+		var pointy ;
+		var context = points[pointIdx].isdrag?draggingCirclesCanvasContext:staticCirclesCanvasContext;
+		var size = points[pointIdx].isdrag?marker_size_regular_point*1.5:marker_size_regular_point;
 		context.strokeStyle = lineColor;
-		centerX = points[0].x;
-		centerY = points[0].y;
-		pointx = points[pointIdx].x;
-		pointy = points[pointIdx].y;
-		radius = distance(pointx,pointy,centerX,centerY);
+		if(editMode==0){
+			centerX = points[0].distortedX;
+			centerY = points[0].distortedY;
+			pointx = points[pointIdx].distortedX;
+			pointy = points[pointIdx].distortedY;
+		}else{
+			centerX = points[0].correctedX;
+			centerY = points[0].correctedY;
+			pointx = points[pointIdx].correctedX;
+			pointy = points[pointIdx].correctedY;
+		}
+
+		var radius = distance(pointx, pointy, centerX, centerY);
 		drawCircle(context, centerX, centerY, radius);
 		
 		
 		context.strokeStyle = selectedPointCircleColor;
 		drawCircle(context, pointx, pointy, size);
+
+		context.fillStyle = textColor;
+		context.font = TEXT_SIZE+"px Arial";
+		context.fillText(points[pointIdx].idx,pointx + size , pointy - size);
+	
 	}
 
 
@@ -371,8 +501,8 @@ function round(value, zecimals = 0){
 	}
 	
 	function distance(p1x,p1y,p2x,p2y){
-		dx = p1x - p2x;
-		dy = p1y - p2y;
+		var dx = p1x - p2x;
+		var dy = p1y - p2y;
 		return Math.sqrt(dx**2 + dy**2);
 	}
 	
@@ -411,41 +541,71 @@ function clearCanvas(context){
 }
 
 function addLensCenter(){
-	points[0] = {x:mouse.x,y:mouse.y,isdrag:0,distortedRadius:0,correctedRadius:0};
+	points[0] = {isdrag:0, distortedX:dx, distortedY:dy, correctedX:cx, correctedY:cy, distortedRadius:0, correctedRadius:0};
 	drawCircleCenter();
 }
 
-
-function addPoint(x,y){
-	if(starttransform==0){
-		dx=x;
-		dy=y;
-		cx=x;
-		cy=y;
+var point_idx = 0;
+function addPoint(x, y){
+	if(editMode==0){
+		var dx=x;
+		var dy=y;
+		[cx, cy] = forwardCorrection(dx, dy);
 	}else{
-		[dx, dy] = inverseCorrection(x,y);
-		cx=x;
-		cy=y;
+		var cx=x;
+		var cy=y;
+		[dx, dy] = inverseCorrection(cx, cy);
 	}
-	points[points.length]={x:x, y:y, isdrag:0,distortedX:dx,distortedY:dy,correctedX:cx,correctedY:cy,distortedRadius:0,correctedRadius:0};
+	points[points.length]={idx: point_idx, isdrag:0, distortedX:dx, distortedY:dy, correctedX:cx, correctedY:cy, distortedRadius:0, correctedRadius:0};
+	point_idx = point_idx + 1;
 	drawPoint(points.length-1);
 }
 	/////////////USER INPUT
 
-function movePoint(idx,x,y,drag){
+function movePoint(idx, x, y, drag){
 	points[idx].isdrag = drag;
-	if(starttransform==0){
-		points[dragedpoint].distortedX = x;
-		points[dragedpoint].distortedY = y;
-		points[dragedpoint].correctedX = x;
-		points[dragedpoint].correctedY = y;
+	var dx = 0;
+	var dy = 0;
+	if(editMode==0){
+		if(moveAllPoints){
+			dx = points[dragedpoint].distortedX - x;
+			dy = points[dragedpoint].distortedY - y;
+		}else{
+			points[dragedpoint].distortedX = x;
+			points[dragedpoint].distortedY = y;
+			if(firstTimeSwitch==0){
+				// [points[dragedpoint].correctedX, points[dragedpoint].correctedY] = forwardCorrection(x, y);
+				points[dragedpoint].correctedX = x;
+				points[dragedpoint].correctedY = y;
+			}
+		}
 	}else{
-		points[dragedpoint].correctedX = x;
-		points[dragedpoint].correctedY = y;
+		if(moveAllPoints){
+			dx = points[dragedpoint].correctedX - x;
+			dy = points[dragedpoint].correctedY - y;
+		}else{
+			points[dragedpoint].correctedX = x;
+			points[dragedpoint].correctedY = y;
+		}
 	}
-	points[dragedpoint].x = x;
-	points[dragedpoint].y = y;
-	
+
+	if(moveAllPoints){
+		for(let i = 0; i < points.length;i++){
+			if(editMode==0){
+				points[i].distortedX = points[i].distortedX - dx;
+				points[i].distortedY = points[i].distortedY - dy;
+				if(firstTimeSwitch==0){
+					// [points[dragedpoint].correctedX, points[dragedpoint].correctedY] = forwardCorrection(x, y);
+					points[i].correctedX = points[i].correctedX - dx;
+					points[i].correctedY = points[i].correctedY - dy;
+				}
+			}else{
+				points[i].correctedX = points[i].correctedX - dx;
+				points[i].correctedY = points[i].correctedY - dy;
+			}
+		}
+	}
+		
 	if(drag)
 		redrawPoint(idx);
 	else
@@ -463,11 +623,11 @@ function mouseMove(e){
 	
 	if(dragedpoint!=-1){
 		console.log("move point " + dragedpoint);
-		movePoint(dragedpoint,mouse.x,mouse.y,1);
+		movePoint(dragedpoint, mouse.x, mouse.y, 1);
 		
 		if(previewlive==1){
 			updatePointsRadius();
-			showCorrectedImage();
+			showImage();
 		}
 	}
 	
@@ -485,9 +645,9 @@ function mouseDown(e){
 	dragedpoint=mouseOnPoint();
 	if(dragedpoint!=-1){
 		console.log("move point " + dragedpoint);
-		movePoint(dragedpoint,mouse.x,mouse.y,1);
+		movePoint(dragedpoint, mouse.x, mouse.y, 1);
 		updatePointsRadius();
-		showCorrectedImage();
+		showImage();
 	}
 	
 	
@@ -505,10 +665,11 @@ function mouseUp(e){
 	
 	if(dragedpoint!=-1){
 		console.log("move point " + dragedpoint);
-		movePoint(dragedpoint,mouse.x,mouse.y,0);
+		movePoint(dragedpoint, mouse.x, mouse.y, 0);
 		dragedpoint=-1;
 		updatePointsRadius();
-		showCorrectedImage();
+		showImage();
+		redrawPoints();
 	}
 	
 }
@@ -525,13 +686,10 @@ function mouseClick(e){
 		return;
 	}
 	
-	if(points.length==0){
-		addLensCenter();
-	}else if(mouseOnPoint()==-1){
+	if(mouseOnPoint()==-1){
 		addPoint(mouse.x, mouse.y);
 		updatePointsRadius();
-		if(starttransform)
-			showCorrectedImage();
+		showImage();
 	}
 	
 }
@@ -541,8 +699,7 @@ function mouseDoubleClick(e){
 	if(dragedpoint!=-1){
 		removePoint(dragedpoint);
 		dragedpoint=-1;
-		if(starttransform)
-			showCorrectedImage();
+		showImage();
 	}
 }
 
@@ -553,18 +710,33 @@ function mouseTripleClick(e){
 function checkedPoints(checkResult){
 ////console.log(checkResult);
 	pointsAreChecked = checkResult;
-	setVisibility(cropButton,checkResult);
-	setVisibility(goodPointsSpan,checkResult);
+	setVisibility(cropButton, checkResult);
+	setVisibility(goodPointsSpan, checkResult);
 	updateOverlayCanvas();
 }
 
 function mouseOnPoint(){
 	if(points.length==0)
 		return -1;
-	if(distance(mouse.downX,mouse.downY,points[0].x,points[0].y) < marker_size_circle_center)
+
+	if(editMode==0){
+		var x = points[0].distortedX;
+		var y = points[0].distortedY;
+	}else{
+		var x = points[0].correctedX;
+		var y = points[0].correctedY;
+	}
+	if(distance(mouse.downX, mouse.downY, x, y) < marker_size_circle_center)
 		return 0;
 	for (let i = 1; i < points.length; i++){
-		if(distance(mouse.downX,mouse.downY,points[i].x,points[i].y) < marker_size_regular_point)
+		if(editMode==0){
+			x = points[i].distortedX;
+			y = points[i].distortedY;
+		}else{
+			x = points[i].correctedX;
+			y = points[i].correctedY;
+		}
+		if(distance(mouse.downX, mouse.downY, x, y) < marker_size_regular_point)
 			return i;
 	}
 	return -1;
@@ -572,19 +744,23 @@ function mouseOnPoint(){
 
 function removePoint(idx){
 	if(idx>0 && idx<points.length){
-		points.splice(idx,1);
+		points.splice(idx, 1);
 		console.log("remove point " + idx);
 	}
 	redrawPoints();
 }
 function updateMousePosition(e){
 	var r = scaledImageCanvasContext.canvas.getBoundingClientRect();
-	mouse.x = e.clientX - r.left,
+	mouse.x = e.clientX - r.left;
 	mouse.y = e.clientY - r.top;
 }
 
-function calculateRadius(x,y){
-	return distance(points[0].x,points[0].y,x,y);
+function calculateRadius(x, y, corrected = 0){
+	if(corrected==0){
+		return distance(points[0].distortedX, points[0].distortedY, x, y);
+	}else{
+		return distance(points[0].correctedX, points[0].correctedY, x, y);
+	}
 }
 
 
@@ -594,14 +770,14 @@ function updatePointsRadius(){
 	points[0].correctedRadius = 0;
 	points[0].distortedRadius = 0;
 	for (let i = 1; i < points.length; i++){
-		points[i].correctedRadius = calculateRadius(points[i].correctedX,points[i].correctedY);
-		points[i].distortedRadius = calculateRadius(points[i].distortedX,points[i].distortedY);
+		points[i].correctedRadius = calculateRadius(points[i].correctedX, points[i].correctedY, 1);
+		points[i].distortedRadius = calculateRadius(points[i].distortedX, points[i].distortedY);
 	}
 	
 	for (let i = 1; i < points.length; i++){
 		for (let j = i; j < points.length; j++){
 			if(points[i].correctedRadius>points[j].correctedRadius){
-				tmp = points[i];
+				let tmp = points[i];
 				points[i]=points[j];
 				points[j]=tmp;
 			}
@@ -609,8 +785,34 @@ function updatePointsRadius(){
 	}
 }
 
-function inverseCorrection(x,y){
-	correctedRadius = calculateRadius(x,y);
+
+function linearInterpolation(val, x0, y0, x1, y1){
+	var dx = x1 - x0;
+	var dy = y1 - y0;
+	return (val-x0)/dx*dy+y0;
+}
+
+function scaleRadius(x, y, cx0, cy0, cx1, cy1, scaling){
+	
+	var dx = x - cx0;
+	var dy = y - cy0;
+	
+	
+	var dxScaled = dx * scaling;
+	var dyScaled = dy * scaling;
+	
+	var xScaled = dxScaled + cx1;
+	var yScaled = dyScaled + cy1;
+
+
+	return [xScaled, yScaled];
+
+}
+
+function inverseCorrection(x, y){
+	if(points.length<2)
+		return [x, y];
+	correctedRadius = calculateRadius(x, y, 1);
 	let highRadIdx=0;
 	for(;highRadIdx < points.length;highRadIdx++){
 		if(points[highRadIdx].correctedRadius>correctedRadius)
@@ -623,38 +825,70 @@ function inverseCorrection(x,y){
 		
 		lowerPoint = points[highRadIdx-1];
 		higherPoint = points[highRadIdx];
+
+		distortedRadius = linearInterpolation(correctedRadius, lowerPoint.correctedRadius,  lowerPoint.distortedRadius, higherPoint.correctedRadius, higherPoint.distortedRadius);
 		
-		lowerCorrectedRadius = lowerPoint.correctedRadius
-		higherCorrectedRadius = higherPoint.correctedRadius
-		lowerDistortedRadius = lowerPoint.distortedRadius
-		higherDistortedRadius = higherPoint.distortedRadius
-		deltaCorrected = higherCorrectedRadius - lowerCorrectedRadius;
-		deltaDistorted = higherDistortedRadius - lowerDistortedRadius;
-		
-		distortedRadius = (correctedRadius - lowerCorrectedRadius)/deltaCorrected*deltaDistorted + lowerDistortedRadius;
 		
 		correction = distortedRadius/correctedRadius;
 	}else{
 		correction = points[points.length - 1].distortedRadius/points[points.length - 1].correctedRadius;
 	}
 	
-	dxCorrected = x - points[0].x;
-	dyCorrected = y - points[0].y;
-	
-	
-	dxDistorted = dxCorrected * correction;
-	dyDistorted = dyCorrected * correction;
-	
-	xDistorted = dxDistorted + points[0].x;
-	yDistorted = dyDistorted + points[0].y;
-	return [xDistorted,yDistorted];
+
+	[xDistorted, yDistorted] = scaleRadius(x, y, points[0].correctedX, points[0].correctedY, points[0].distortedX, points[0].distortedY, correction);
+
+	return [xDistorted, yDistorted];
 }
 
 
-function forwardCorrection(x,y){
-	return [x,y];
+function forwardCorrection(x, y){
+	if(points.length<2)
+		return [x, y];
+	let distortedRadius = calculateRadius(x, y);
+	let highRadIdx=0;
+	for(;highRadIdx < points.length;highRadIdx++){
+		if(points[highRadIdx].distortedRadius>distortedRadius)
+			break;
+	}
+	
+	var correction;
+	if(highRadIdx < points.length){
+		
+		
+		let lowerPoint = points[highRadIdx-1];
+		let higherPoint = points[highRadIdx];
+
+		var correctedRadius = linearInterpolation(distortedRadius, lowerPoint.distortedRadius,  lowerPoint.correctedRadius, higherPoint.distortedRadius, higherPoint.correctedRadius);
+		
+		
+		correction = correctedRadius/distortedRadius;
+	}else{
+		correction = points[points.length - 1].correctedRadius/points[points.length - 1].distortedRadius;
+	}
+	
+
+	var [xCorrected, yCorrected] = scaleRadius(x, y, points[0].correctedX, points[0].correctedY, points[0].distortedX, points[0].distortedY, correction);
+
+	return [xCorrected, yCorrected];
 }
 
+function showImage(){
+	if(editMode==0){
+		showOriginalImage();
+	}else{
+		showCorrectedImage();
+	}
+}
+
+function showOriginalImage(){
+
+	var outputImageData = scaledImageCanvasContext.createImageData(scaledImageWidth, scaledImageHeight);
+	let i = scaledImageData.length;
+	while(i--)
+		outputImageData.data[i] = scaledImageData[i];
+	scaledImageCanvasContext.putImageData(outputImageData,0,0);
+
+}
 
 function showCorrectedImage(){
 	
@@ -675,15 +909,15 @@ function showCorrectedImage(){
 		
 		for (var j=0; j < canvas.height;j+=1)//maxWidth; j += 1) 
 		{	
-			row=j;
-			col=i;
-			[in_col,in_row] = inverseCorrection(col,row);
+			let row=j;
+			let col=i;
+			let [in_col, in_row] = inverseCorrection(col, row);
 			let idxout = j * canvas.width + i;
 			let idxin = Math.floor(in_row) * scaledImageWidth + Math.floor(in_col); 
 		//console.log(P3);
 			idxout = Math.floor(idxout) * 4; //RGBA
 			idxin = Math.floor(idxin) * 4; //RGBA
-			//console.log({i,j,ii,P3,jj});
+			//console.log({i, j, ii, P3, jj});
 			outputData[idxout] = inputData[idxin];
 			outputData[idxout+1] = inputData[idxin+1];
 			outputData[idxout+2] = inputData[idxin+2];
@@ -691,13 +925,13 @@ function showCorrectedImage(){
 		}
 	}
 	
-	scaledImageCanvasContext.putImageData(outputImageData,0,0);
+	scaledImageCanvasContext.putImageData(outputImageData, 0, 0);
 	
 	//var base64URI = canvasEdited.toDataURL();		
 	
 	//var img = new Image;
 	//img.onload = function() { 
-	//scaledImageCanvasContext.drawImage(img,0,0);
+	//scaledImageCanvasContext.drawImage(img, 0, 0);
 	//base64URI = canvasEdited.toDataURL();	 
 	
 	//croppedImage.src = base64URI;

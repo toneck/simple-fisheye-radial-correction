@@ -12,6 +12,8 @@
 				<h3>Image source:</h3>
 				<p>Choose a file:</p>
 				<input type="file" id="myImageFile"></input>
+				<p>Load saved points:</p>
+				<input type="file" id="myPointsFile"></input>
 				<!---
 				<p>Paste link and hit ENTER:</p>
 				<input type="link" id="myImageLink"></input>
@@ -56,13 +58,16 @@
 				<p></p>
 				<button id="refreshButton"> Refresh </button>  
 				<p></p>
-				<button id="downloadButton"> Download </button>  
+				<button id="downloadButton"> Download Corrected Image</button>  
+				<p></p>
+				<button id="downloadPoints"> Download Points data</button>  
 				<p></p>
 				<button id="showButton"> Show Points </button>  
 				<table id="pointsTable">
 				
 				
 				</table>
+				
 				<span id="goodPointsSpan" style="color:green; display:none;"> Points well placed</span>
 				<p></p>
 				<button id="cropButton" onclick="cropButtonCall()" style="display:none;"> Crop! </button>
@@ -191,7 +196,7 @@ var BACKLIGHT_CONTOUR_SIZE = 40;
 			
 			var tgt = evt.target || window.event.srcElement,
 			files = tgt.files;console.log("img data:", evt);
-
+			
 			// FileReader support
 			if (FileReader && files && files.length) {
 				var fr = new FileReader();
@@ -200,6 +205,31 @@ var BACKLIGHT_CONTOUR_SIZE = 40;
 			}
 		}
 		
+		document.getElementById('myPointsFile').onchange = function (evt) {
+					
+			var tgt = evt.target || window.event.srcElement,
+			files = tgt.files;
+
+			// FileReader support
+			if (FileReader && files && files.length) {
+				var fr = new FileReader();
+				fr.onload = () => {
+					points = JSON.parse(fr.result);
+					point_idx = points[0].idx;
+					for(point of points){
+						if(point.idx > point_idx)
+							point_idx = point.idx;
+					}
+					point_idx = point_idx + 1;
+
+					redrawPoints();
+				}
+				fr.readAsText(files[0]);
+			}
+			
+			
+		}
+
 		/*
 		document.getElementById('myImageLink').onchange = function (evt) {
 			var img = new Image;
@@ -254,6 +284,11 @@ var BACKLIGHT_CONTOUR_SIZE = 40;
 			}
 			updatePointsRadius();
 			showImage();
+		}
+
+		document.getElementById('downloadPoints').onclick = function(evt){
+			updatePointsRadius();
+			export2txt(points,"points.json");
 		}
 
 		document.getElementById('moveAllPoints').onclick = function (evt) {
@@ -961,6 +996,28 @@ function showCorrectedImage(){
 14 380.67834191085785 282.11345235560816
 15 400.5246559202067 314.0143308831621
 */
+
+//https://stackoverflow.com/a/34156339
+function download(content, fileName, contentType) {
+    var a = document.createElement("a");
+    var file = new Blob([content], {type: contentType});
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+}
+//download(jsonData, 'json.txt', 'text/plain');
+
+//https://stackoverflow.com/a/60377870
+function export2txt(originalData,name = "data.json") {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(originalData, null, 2)], {
+    type: "text/plain"
+  }));
+  a.setAttribute("download", name);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 
 </script>
